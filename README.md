@@ -17,6 +17,9 @@ those changes available as per the licese.
 
 ## Prerequisites
 
+Components in this library assume the availability of the X-Plane SDK and may
+rely upon unstable/still-in-development features.
+
 Some components in this library may assume availability of the 
 [libxplanemp](https://github.com/kuroneko/libxplanemp) sources and functions.
 
