@@ -1,0 +1,39 @@
+/* WavFile.h
+ *
+ * Class(es) for reading audio samples
+ *
+ * Copyright (C) 2018, Christopher Collins
+ */
+
+/*
+ * This module is only intended to support a narrow subset of possible Wav 
+ * files, namely: PCM only.
+*/
+
+#ifndef _WAVFILE_H
+#define _WAVFILE_H
+
+#include <stdint.h>
+
+class AudioSampleData {
+protected:
+	int8_t		mNumChannels;
+	int8_t		mBitsPerSample;
+	uint8_t		mSampleAlignment;
+	int 		mSampleRate;
+
+	unsigned	mSampleCount;
+	void *		mSampleData;
+
+public:
+	AudioSampleData(int numChannels, int bitsPerSample, int sampleRate);
+	AudioSampleData(AudioSampleData &&move_src);
+	AudioSampleData(const AudioSampleData &cpy_src);
+	virtual		~AudioSampleData();
+
+	void			AppendSamples(uint8_t blockSize, unsigned count, void *data);
+};
+
+AudioSampleData *	LoadWav(const char *fileName);
+
+#endif /* _WAVFILE_H */
