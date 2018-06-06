@@ -161,11 +161,113 @@ FindTOCFor(const vector<WavTOCEntry> &toc, const char *chunk_id)
 	return std::find_if(toc.cbegin(), toc.cend(), [chunk_id](const WavTOCEntry &x) -> bool {return !memcmp(x.ch.chunkID, chunk_id, 4); });
 }
 
+static bool
+readHeader(FILE *srcFile, const struct ChunkHeader &ch, vector<WavTOCEntry> &o_HeaderItems)
+{
+	uint32_t	expectedBytesLeft = ch.chunkSize - 4;
+
+	while (expectedBytesLeft > 0) {
+		/* if there's less than a chunkheader less, there's a problem. */
+		if (expectedBytesLeft < sizeof(struct ChunkHeader)) {
+			return false;
+		}
+
+		WavTOCEntry e;
+		if (1 != fread(&e.ch, sizeof(e.ch), 1, srcFile)) {
+			return false;
+		}
+		expectedBytesLeft -= sizeof(e.ch);
+
+		/* make sure the expected file size is large enough */
+		if (e.ch.chunkSize > expectedBytesLeft) {
+			return false;
+		}
+		e.offset = ftell(srcFile);
+		o_HeaderItems.emplace_back(e);
+
+		/* skip forward to the next chunk */
+		fseek(srcFile, e.ch.chunkSize, SEEK_CUR);
+		expectedBytesLeft -= e.ch.chunkSize;
+	}
+	return true;
+}
+
+static 
+AudioSampleData *extractData(FILE* fh, const vector<WavTOCEntry> &toc)
+{
+	uint8_t *dbuf = nullptr;
+	AudioSampleData *asd = nullptr;
+
+	/* if we get here without an error, it means the file was well formed and
+	 * we now have a ToC for the file chunks 
+	 * 
+	 * Find the format header.
+	 */
+	auto ti = FindTOCFor(toc, WavFormatChunkID);
+	if (ti == toc.end()) {
+		// couldn't find the format chunk
+		return nullptr;
+	}
+	fseek(fh, ti->offset, SEEK_SET);
+	int chunkSize = ti->ch.chunkSize;
+
+	/* safety check - the chunk can't be smaller than 16 bytes */
+	if (chunkSize < 16) {
+		return nullptr;
+	}
+	/* and cap it at the size of the header struct so we don't buffer overflow */
+	if (chunkSize > sizeof(WavFormatChunk)) {
+		chunkSize = sizeof(WavFormatChunk);
+	}
+
+	struct WavFormatChunk	fc;
+	if (1 != fread(&fc, chunkSize, 1, fh)) {
+		return nullptr;
+	}
+
+	/* now that we have the header, verify that we can support the format. */
+	if (fc.wFormatTag != WAV_FORMAT_PCM) {
+		return nullptr;
+	}
+	/* sanity check the block stride */
+	if (fc.nBlockAlign < minimumBlockAlignment(fc.wBitsPerSample, fc.nChannels)) {
+		return nullptr;
+	}
+
+	asd = new AudioSampleData(fc.nChannels, fc.wBitsPerSample, fc.nSamplesPerSec);
+
+	/* now to check the data block */
+	ti = FindTOCFor(toc, WavDataChunkID);
+	if (ti == toc.end()) {
+		goto fail2;
+	}
+
+	/* we can live with short reads here, so we use a slightly different strategy */
+	fseek(fh, ti->offset, SEEK_SET);
+
+	dbuf = reinterpret_cast<uint8_t *>(malloc(ti->ch.chunkSize));
+	if (nullptr == dbuf) {
+		goto fail2;
+	}
+	const size_t samplesRead = fread(dbuf, fc.nBlockAlign, ti->ch.chunkSize / fc.nBlockAlign, fh);
+	if (samplesRead <= 0) {
+		goto fail;
+	}
+	asd->AppendSamples(ti->ch.chunkSize, static_cast<unsigned>(samplesRead), dbuf);	
+	return asd;
+fail:
+	free(dbuf);
+fail2:
+	delete asd;
+	return nullptr;
+}
+
 AudioSampleData *
 LoadWav(const char *fileName)
 {
 	FILE *fh = nullptr;
-	
+	vector<WavTOCEntry>	toc;
+
 	fh = fopen(fileName, "rb");
 	if (fh == nullptr) {
 		return nullptr;
@@ -199,94 +301,16 @@ LoadWav(const char *fileName)
 
 	/* if were're still here, the file is valid so far, now we need to read
 	 * scan the wave file to find the blocks we need */
-	vector<WavTOCEntry>	toc;
-	uint32_t	expectedBytesLeft = ch.chunkSize - 4;
-
-	while (expectedBytesLeft > 0) {
-		/* if there's less than a chunkheader less, there's a problem. */
-		if (expectedBytesLeft < sizeof(struct ChunkHeader))
-			goto fail;
-		WavTOCEntry e;
-		if (1 != fread(&e.ch, sizeof(e.ch), 1, fh)) {
-			goto fail;
-		}
-		expectedBytesLeft -= sizeof(e.ch);
-
-		/* make sure the expected file size is large enough */
-		if (e.ch.chunkSize > expectedBytesLeft) {
-			goto fail;
-		}
-		e.offset = ftell(fh);
-		toc.emplace_back(e);
-
-		/* skip forward to the next chunk */
-		fseek(fh, e.ch.chunkSize, SEEK_CUR);
-		expectedBytesLeft -= e.ch.chunkSize;
-	}
-
-	/* if we get here without an error, it means the file was well formed and
-	 * we now have a ToC for the file chunks 
-	 * 
-	 * Find the format header.
-	 */
-	auto ti = FindTOCFor(toc, WavFormatChunkID);
-	if (ti == toc.end()) {
-		// couldn't find the format chunk
-		goto fail;
-	}
-	fseek(fh, ti->offset, SEEK_SET);
-	int chunkSize = ti->ch.chunkSize;
-
-	/* safety check - the chunk can't be smaller than 16 bytes */
-	if (chunkSize < 16) {
-		goto fail;
-	}
-	/* and cap it at the size of the header struct so we don't buffer overflow */
-	if (chunkSize > sizeof(WavFormatChunk)) {
-		chunkSize = sizeof(WavFormatChunk);
-	}
-
-	struct WavFormatChunk	fc;
-	if (1 != fread(&fc, chunkSize, 1, fh)) {
+	if (!readHeader(fh, ch, toc)) {
 		goto fail;
 	}
 
-	/* now that we have the header, verify that we can support the format. */
-	if (fc.wFormatTag != WAV_FORMAT_PCM) {
-		goto fail;
-	}
-	/* sanity check the block stride */
-	if (fc.nBlockAlign < minimumBlockAlignment(fc.wBitsPerSample, fc.nChannels)) {
+	AudioSampleData* asd = extractData(fh, toc);
+	if (asd == nullptr) {
 		goto fail;
 	}
 
-	/* allocate the output object now */
-	auto *asd = new AudioSampleData(fc.nChannels, fc.wBitsPerSample, fc.nSamplesPerSec);
-
-	/* now to check the data block */
-	ti = FindTOCFor(toc, WavDataChunkID);
-	if (ti == toc.end()) {
-		goto fail2;
-	}
-
-	/* we can live with short reads here, so we use a slightly different strategy */
-	fseek(fh, ti->offset, SEEK_SET);
-	void *dbuf = malloc(ti->ch.chunkSize);
-	if (nullptr == dbuf) {
-		goto fail2;
-	}
-	const int samplesRead = fread(dbuf, fc.nBlockAlign, ti->ch.chunkSize / fc.nBlockAlign, fh);
-	if (samplesRead <= 0) {
-		goto fail3;
-	}
-	asd->AppendSamples(ti->ch.chunkSize, samplesRead, dbuf);
-
-	free(dbuf);
 	return asd;
-fail3:
-	free(dbuf);
-fail2:
-	delete asd;
 fail:
 	if (fh != nullptr) {
 		fclose(fh);
