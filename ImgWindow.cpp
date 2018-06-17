@@ -123,6 +123,7 @@ ImgWindow::configureImguiContext()
 
 ImgWindow::~ImgWindow()
 {
+	ImGui::SetCurrentContext(mImGuiContext);
 	glDeleteTextures(1, &mFontTexture);
 	ImGui::DestroyContext(mImGuiContext);
 	XPLMDestroyWindow(mWindowID);
