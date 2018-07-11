@@ -329,27 +329,24 @@ ImgWindow::HandleMouseClickGeneric(int x, int y, XPLMMouseStatus inMouse, int bu
 {
 	ImGui::SetCurrentContext(mImGuiContext);
 	ImGuiIO& io = ImGui::GetIO();
-	if (io.WantCaptureMouse) {
-		float outX, outY;
-		translateToImguiSpace(x, y, outX, outY);
-		io.MousePos = ImVec2(outX, outY);
 
-		switch (inMouse) {
-		case xplm_MouseDown:
-		case xplm_MouseDrag:
-			io.MouseDown[button] = true;
-			break;
-		case xplm_MouseUp:
-			io.MouseDown[button] = false;
-			break;
-		default:
-			// dunno!
-			break;
-		}
-		return 1;
-	} else {
-		return 0;
+	float outX, outY;
+	translateToImguiSpace(x, y, outX, outY);
+	io.MousePos = ImVec2(outX, outY);
+
+	switch (inMouse) {
+	case xplm_MouseDown:
+	case xplm_MouseDrag:
+		io.MouseDown[button] = true;
+		break;
+	case xplm_MouseUp:
+		io.MouseDown[button] = false;
+		break;
+	default:
+		// dunno!
+		break;
 	}
+	return 1;
 }
 
 
@@ -411,24 +408,22 @@ ImgWindow::HandleMouseWheelFuncCB(
 	auto *thisWindow = reinterpret_cast<ImgWindow *>(inRefcon);
 	ImGui::SetCurrentContext(thisWindow->mImGuiContext);
 	ImGuiIO& io = ImGui::GetIO();
-	if (io.WantCaptureMouse) {
-		float outX, outY;
-		thisWindow->translateToImguiSpace(x, y, outX, outY);
-		io.MousePos = ImVec2(outX, outY);
-		switch (wheel) {
-		case 0:
-			io.MouseWheel = static_cast<float>(clicks);
-			break;
-		case 1:
-			io.MouseWheelH = static_cast<float>(clicks);
-			break;
-		default:
-			// unknown wheel
-			break;
-		}
-		return 1;
+
+	float outX, outY;
+	thisWindow->translateToImguiSpace(x, y, outX, outY);
+	io.MousePos = ImVec2(outX, outY);
+	switch (wheel) {
+	case 0:
+		io.MouseWheel = static_cast<float>(clicks);
+		break;
+	case 1:
+		io.MouseWheelH = static_cast<float>(clicks);
+		break;
+	default:
+		// unknown wheel
+		break;
 	}
-	return 0;
+	return 1;
 }
 
 int
