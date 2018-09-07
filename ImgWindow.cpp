@@ -94,7 +94,7 @@ ImgWindow::ImgWindow(
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width, height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, pixels);
 	io.Fonts->TexID = (void *)(intptr_t)(mFontTexture);
 	// disable OSX-like keyboard behaviours always - we don't have the keymapping for it.
-	io.OptMacOSXBehaviors = false;
+	io.ConfigMacOSXBehaviors = false; // io.OptMacOSXBehaviors = false;
 
 	XPLMCreateWindow_t	windowParams = {
 		sizeof(windowParams),
@@ -114,6 +114,74 @@ ImgWindow::ImgWindow(
 		HandleRightClickFuncCB,
 	};
 	mWindowID = XPLMCreateWindowEx(&windowParams);
+}
+
+void ImgWindow::init()
+{
+    mImGuiContext = ImGui::CreateContext();
+    ImGui::SetCurrentContext(mImGuiContext);
+    auto &io = ImGui::GetIO();
+
+    static bool first_init=false;
+    if (!first_init) {
+        gVrEnabledRef = XPLMFindDataRef("sim/graphics/VR/enabled");
+        gModelviewMatrixRef = XPLMFindDataRef("sim/graphics/view/modelview_matrix");
+        gViewportRef = XPLMFindDataRef("sim/graphics/view/viewport");
+        gProjectionMatrixRef = XPLMFindDataRef("sim/graphics/view/projection_matrix");
+
+        first_init=true;
+    }
+
+    // we render ourselves, we don't use the DrawListsFunc
+    io.RenderDrawListsFn = nullptr;
+    // set up the Keymap
+    io.KeyMap[ImGuiKey_Tab] = XPLM_VK_TAB;
+    io.KeyMap[ImGuiKey_LeftArrow] = XPLM_VK_LEFT;
+    io.KeyMap[ImGuiKey_RightArrow] = XPLM_VK_RIGHT;
+    io.KeyMap[ImGuiKey_UpArrow] = XPLM_VK_UP;
+    io.KeyMap[ImGuiKey_DownArrow] = XPLM_VK_DOWN;
+    io.KeyMap[ImGuiKey_PageUp] = XPLM_VK_PRIOR;
+    io.KeyMap[ImGuiKey_PageDown] = XPLM_VK_NEXT;
+    io.KeyMap[ImGuiKey_Home] = XPLM_VK_HOME;
+    io.KeyMap[ImGuiKey_End] = XPLM_VK_END;
+    io.KeyMap[ImGuiKey_Insert] = XPLM_VK_INSERT;
+    io.KeyMap[ImGuiKey_Delete] = XPLM_VK_DELETE;
+    io.KeyMap[ImGuiKey_Backspace] = XPLM_VK_BACK;
+    io.KeyMap[ImGuiKey_Space] = XPLM_VK_SPACE;
+    io.KeyMap[ImGuiKey_Enter] = XPLM_VK_ENTER;
+    io.KeyMap[ImGuiKey_Escape] = XPLM_VK_ESCAPE;
+    io.KeyMap[ImGuiKey_A] = XPLM_VK_A;
+    io.KeyMap[ImGuiKey_C] = XPLM_VK_C;
+    io.KeyMap[ImGuiKey_V] = XPLM_VK_V;
+    io.KeyMap[ImGuiKey_X] = XPLM_VK_X;
+    io.KeyMap[ImGuiKey_Y] = XPLM_VK_Y;
+    io.KeyMap[ImGuiKey_Z] = XPLM_VK_Z;
+
+    // disable window rounding since we're not rendering the frame anyway.
+    auto &style = ImGui::GetStyle();
+    style.WindowRounding = 0;
+
+    configureImguiContext();
+
+    // bind the font
+    unsigned char* pixels;
+    int width, height;
+    io.Fonts->GetTexDataAsAlpha8(&pixels, &width, &height);
+
+    // slightly stupid dance around the texture number due to XPLM not using GLint here.
+    int texNum = 0;
+    XPLMGenerateTextureNumbers(&texNum, 1);
+    mFontTexture = (GLuint) texNum;
+
+    // upload texture.
+    XPLMBindTexture2d(mFontTexture, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width, height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, pixels);
+    io.Fonts->TexID = (void *)(intptr_t)(mFontTexture);
+    // disable OSX-like keyboard behaviours always - we don't have the keymapping for it.
+    io.ConfigMacOSXBehaviors = false; // io.OptMacOSXBehaviors = false;
 }
 
 void

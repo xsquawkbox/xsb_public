@@ -206,6 +206,11 @@ public:
 	 * @return true if the window is visible, false otherwise.
 	*/
 	bool GetVisible() const;
+
+	/** init() alow overriding of configureImguiContext() because.
+     *  it is being called in a function and not in the constructor.
+    */
+    void init();
 };
 
 #endif // #ifndef IMGWINDOW_H
