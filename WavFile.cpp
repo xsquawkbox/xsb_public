@@ -13,7 +13,6 @@
 #include <string>
 #include <vector>
 #include <algorithm>
-#include <dsound.h>
 
 using namespace std;
 
