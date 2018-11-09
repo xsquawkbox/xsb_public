@@ -117,6 +117,45 @@ AudioSampleData::AppendSamples(uint8_t blockSize, unsigned count, void *data)
 	}
 }
 
+/* ==== Getters ==== */
+
+int8_t
+AudioSampleData::getNumChannels() const
+{
+	return mNumChannels;
+
+}
+
+int8_t
+AudioSampleData::getBitsPerSample() const
+{
+	return mBitsPerSample;
+}
+
+uint8_t
+AudioSampleData::getSampleAlignment() const
+{
+	return mSampleAlignment;
+}
+
+int
+AudioSampleData::getSampleRate() const
+{
+	return mSampleRate;
+}
+
+size_t
+AudioSampleData::getSampleCount() const
+{
+	return mSampleCount;
+}
+
+const void *
+AudioSampleData::getSampleData() const
+{
+	return mSampleData;
+}
+
 /* ==== WAVE Loading Logic Below ==== */
 
 static const char *	WavTopChunkID = "RIFF";
@@ -184,9 +223,14 @@ readHeader(FILE *srcFile, const struct ChunkHeader &ch, vector<WavTOCEntry> &o_H
 		e.offset = ftell(srcFile);
 		o_HeaderItems.emplace_back(e);
 
+		int pad = 0;
+		if ((e.ch.chunkSize % 2) != 0) {
+			pad = 1;
+		}
+
 		/* skip forward to the next chunk */
-		fseek(srcFile, e.ch.chunkSize, SEEK_CUR);
-		expectedBytesLeft -= e.ch.chunkSize;
+		fseek(srcFile, e.ch.chunkSize + pad, SEEK_CUR);
+		expectedBytesLeft -= e.ch.chunkSize + pad;
 	}
 	return true;
 }
@@ -252,7 +296,7 @@ AudioSampleData *extractData(FILE* fh, const vector<WavTOCEntry> &toc)
 	if (samplesRead <= 0) {
 		goto fail;
 	}
-	asd->AppendSamples(ti->ch.chunkSize, static_cast<unsigned>(samplesRead), dbuf);	
+	asd->AppendSamples(fc.nBlockAlign, static_cast<unsigned>(samplesRead), dbuf);	
 	return asd;
 fail:
 	free(dbuf);

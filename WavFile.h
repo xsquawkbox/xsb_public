@@ -13,7 +13,7 @@
 #ifndef _WAVFILE_H
 #define _WAVFILE_H
 
-#include <stdint.h>
+#include <cstdint>
 
 class AudioSampleData {
 protected:
@@ -29,8 +29,14 @@ public:
 	AudioSampleData(int numChannels, int bitsPerSample, int sampleRate);
 	AudioSampleData(AudioSampleData &&move_src);
 	AudioSampleData(const AudioSampleData &cpy_src);
-	virtual		~AudioSampleData();
+	virtual			~AudioSampleData();
 
+	int8_t 			getNumChannels() const;
+	int8_t			getBitsPerSample() const;
+	uint8_t			getSampleAlignment() const;
+	int				getSampleRate() const;
+	size_t			getSampleCount() const;
+	const void *	getSampleData() const;
 	void			AppendSamples(uint8_t blockSize, unsigned count, void *data);
 };
 
