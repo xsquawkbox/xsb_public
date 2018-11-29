@@ -115,6 +115,7 @@ AudioSampleData::AppendSamples(uint8_t blockSize, unsigned count, void *data)
 			dptr += mSampleAlignment;
 		}
 	}
+	mSampleCount = newCount;
 }
 
 /* ==== Getters ==== */
