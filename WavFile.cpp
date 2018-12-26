@@ -241,6 +241,7 @@ AudioSampleData *extractData(FILE* fh, const vector<WavTOCEntry> &toc)
 {
 	uint8_t *dbuf = nullptr;
 	AudioSampleData *asd = nullptr;
+	size_t samplesRead = 0;
 
 	/* if we get here without an error, it means the file was well formed and
 	 * we now have a ToC for the file chunks 
@@ -293,7 +294,7 @@ AudioSampleData *extractData(FILE* fh, const vector<WavTOCEntry> &toc)
 	if (nullptr == dbuf) {
 		goto fail2;
 	}
-	const size_t samplesRead = fread(dbuf, fc.nBlockAlign, ti->ch.chunkSize / fc.nBlockAlign, fh);
+	samplesRead = fread(dbuf, fc.nBlockAlign, ti->ch.chunkSize / fc.nBlockAlign, fh);
 	if (samplesRead <= 0) {
 		goto fail;
 	}
@@ -311,6 +312,7 @@ LoadWav(const char *fileName)
 {
 	FILE *fh = nullptr;
 	vector<WavTOCEntry>	toc;
+	AudioSampleData* asd = nullptr;
 
 	fh = fopen(fileName, "rb");
 	if (fh == nullptr) {
@@ -349,7 +351,7 @@ LoadWav(const char *fileName)
 		goto fail;
 	}
 
-	AudioSampleData* asd = extractData(fh, toc);
+	asd = extractData(fh, toc);
 	if (asd == nullptr) {
 		goto fail;
 	}

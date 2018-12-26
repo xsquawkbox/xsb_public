@@ -13,6 +13,7 @@
 #ifndef _WAVFILE_H
 #define _WAVFILE_H
 
+#include <cstdlib>
 #include <cstdint>
 
 class AudioSampleData {
