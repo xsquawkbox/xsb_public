@@ -28,3 +28,4 @@ Some components in this library may assume availability of the
 * `ImgWindow` - Wrapper for the [dear imgui](https://github.com/ocornut/imgui)
   Immediate Mode GUI library
 
+* `WavFile` - Simple PCM Wavfile loader as used by XSB 1.4 onwards.
