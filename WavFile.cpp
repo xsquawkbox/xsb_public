@@ -48,10 +48,11 @@ minimumBlockAlignment(int sampleSize, int numChannels)
 }
 
 
-AudioSampleData::AudioSampleData(int numChannels, int bitsPerSample, int sampleRate) :
+AudioSampleData::AudioSampleData(int numChannels, int bitsPerSample, int sampleRate, bool isFloat) :
 	mNumChannels(numChannels), 
 	mBitsPerSample(bitsPerSample), 
-	mSampleRate(sampleRate)
+	mSampleRate(sampleRate),
+	mIsFloat(isFloat)
 {
 	mSampleAlignment = minimumBlockAlignment(mBitsPerSample, mNumChannels);
 	mSampleCount = 0;
@@ -157,6 +158,12 @@ AudioSampleData::getSampleData() const
 	return mSampleData;
 }
 
+bool
+AudioSampleData::isFloat() const
+{
+	return mIsFloat;
+}
+
 /* ==== WAVE Loading Logic Below ==== */
 
 static const char *	WavTopChunkID = "RIFF";
@@ -188,6 +195,7 @@ struct WavFormatChunk {
 #pragma pack(pop)
 
 const uint16_t	WAV_FORMAT_PCM = 1;
+const uint16_t	WAV_FORMAT_IEEE_FLOAT = 3;
 
 typedef struct WavTOCEntry {
 	struct ChunkHeader	ch;
@@ -271,7 +279,7 @@ AudioSampleData *extractData(FILE* fh, const vector<WavTOCEntry> &toc)
 	}
 
 	/* now that we have the header, verify that we can support the format. */
-	if (fc.wFormatTag != WAV_FORMAT_PCM) {
+	if (fc.wFormatTag != WAV_FORMAT_PCM && fc.wFormatTag != WAV_FORMAT_IEEE_FLOAT) {
 		return nullptr;
 	}
 	/* sanity check the block stride */
@@ -279,7 +287,7 @@ AudioSampleData *extractData(FILE* fh, const vector<WavTOCEntry> &toc)
 		return nullptr;
 	}
 
-	asd = new AudioSampleData(fc.nChannels, fc.wBitsPerSample, fc.nSamplesPerSec);
+	asd = new AudioSampleData(fc.nChannels, fc.wBitsPerSample, fc.nSamplesPerSec, fc.wFormatTag == WAV_FORMAT_IEEE_FLOAT);
 
 	/* now to check the data block */
 	ti = FindTOCFor(toc, WavDataChunkID);

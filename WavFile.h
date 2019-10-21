@@ -26,8 +26,10 @@ protected:
 	unsigned	mSampleCount;
 	void *		mSampleData;
 
+	bool		mIsFloat;
+
 public:
-	AudioSampleData(int numChannels, int bitsPerSample, int sampleRate);
+	AudioSampleData(int numChannels, int bitsPerSample, int sampleRate, bool isFloat=false);
 	AudioSampleData(AudioSampleData &&move_src);
 	AudioSampleData(const AudioSampleData &cpy_src);
 	virtual			~AudioSampleData();
@@ -38,6 +40,7 @@ public:
 	int				getSampleRate() const;
 	size_t			getSampleCount() const;
 	const void *	getSampleData() const;
+	bool			isFloat() const;
 	void			AppendSamples(uint8_t blockSize, unsigned count, void *data);
 };
 
