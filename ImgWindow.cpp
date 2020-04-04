@@ -3,13 +3,13 @@
  *
  * Integration for dear imgui into X-Plane.
  *
- * Copyright (C) 2018, Christopher Collins
+ * Copyright (C) 2018,2020, Christopher Collins
 */
 
 #include <XPLMDataAccess.h>
 #include <XPLMDisplay.h>
 #include <XPLMGraphics.h>
-#include "SysOpenGL.h"
+#include "SystemGL.h"
 #include "XOGLUtils.h"
 #include "ImgWindow.h"
 
@@ -18,6 +18,8 @@ static XPLMDataRef		gVrEnabledRef			= nullptr;
 static XPLMDataRef		gModelviewMatrixRef		= nullptr;
 static XPLMDataRef		gViewportRef			= nullptr;
 static XPLMDataRef		gProjectionMatrixRef	= nullptr;
+
+std::shared_ptr<ImgFontAtlas> ImgWindow::sFontAtlas;
 
 ImgWindow::ImgWindow(
 	int left,
@@ -31,7 +33,12 @@ ImgWindow::ImgWindow(
 	mSelfDestruct(false),
 	mFirstRender(true)
 {
-	mImGuiContext = ImGui::CreateContext();
+    ImFontAtlas *iFontAtlas = nullptr;
+    if (sFontAtlas) {
+        sFontAtlas->bindTexture();
+        iFontAtlas = sFontAtlas->getAtlas();
+    }
+	mImGuiContext = ImGui::CreateContext(iFontAtlas);
 	ImGui::SetCurrentContext(mImGuiContext);
 	auto &io = ImGui::GetIO();
 
@@ -74,8 +81,6 @@ ImgWindow::ImgWindow(
 	auto &style = ImGui::GetStyle();
 	style.WindowRounding = 0;
 
-	configureImguiContext();
-
 	// bind the font
 	unsigned char* pixels;
 	int width, height;
@@ -93,8 +98,13 @@ ImgWindow::ImgWindow(
 	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width, height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, pixels);
 	io.Fonts->TexID = (void *)(intptr_t)(mFontTexture);
+
 	// disable OSX-like keyboard behaviours always - we don't have the keymapping for it.
-	io.OptMacOSXBehaviors = false;
+	io.ConfigMacOSXBehaviors = false;
+
+	// try to inhibit a few resize/move behaviours that won't play nice with our window control.
+	io.ConfigWindowsResizeFromEdges = false;
+	io.ConfigWindowsMoveFromTitleBarOnly = true;
 
 	XPLMCreateWindow_t	windowParams = {
 		sizeof(windowParams),
@@ -114,11 +124,6 @@ ImgWindow::ImgWindow(
 		HandleRightClickFuncCB,
 	};
 	mWindowID = XPLMCreateWindowEx(&windowParams);
-}
-
-void
-ImgWindow::configureImguiContext()
-{
 }
 
 ImgWindow::~ImgWindow()
@@ -161,6 +166,12 @@ ImgWindow::boxelsToNative(int x, int y, int &outX, int &outY)
 	outX = static_cast<int>((ndc[0] * 0.5f + 0.5f) * mViewport[2] + mViewport[0]);
 	outY = static_cast<int>((ndc[1] * 0.5f + 0.5f) * mViewport[3] + mViewport[1]);
 }
+
+/*
+ * NB:  This is a modified version of the imGui OpenGL2 renderer - however, because
+ *     we need to play nice with the X-Plane GL state management, we cannot use
+ *     the upstream one.
+ */
 
 void
 ImgWindow::RenderImGui(ImDrawData *draw_data)
@@ -207,7 +218,7 @@ ImgWindow::RenderImGui(ImDrawData *draw_data)
 			if (pcmd->UserCallback)	{
 				pcmd->UserCallback(cmd_list, pcmd);
 			} else {
-				glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->TextureId);
+			    XPLMBindTexture2d((GLuint)(intptr_t)pcmd->TextureId, 0);
 
 				// Scissors work in viewport space - must translate the coordinates from ImGui -> Boxels, then Boxels -> Native.
 				//FIXME: it must be possible to apply the scale+transform manually to the projection matrix so we don't need to doublestep.
