@@ -5,6 +5,7 @@
 #ifndef XSQUAWKBOX_VATSIM_IMGFONTATLAS_H
 #define XSQUAWKBOX_VATSIM_IMGFONTATLAS_H
 
+#include "SystemGL.h"
 #include <imgui.h>
 
 /** Construct an empty font atlas we can use later

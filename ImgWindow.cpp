@@ -6,12 +6,12 @@
  * Copyright (C) 2018,2020, Christopher Collins
 */
 
+#include "ImgWindow.h"
+
 #include <XPLMDataAccess.h>
 #include <XPLMDisplay.h>
 #include <XPLMGraphics.h>
-#include "SystemGL.h"
-#include "XOGLUtils.h"
-#include "ImgWindow.h"
+
 
 
 static XPLMDataRef		gVrEnabledRef			= nullptr;
@@ -343,6 +343,7 @@ ImgWindow::HandleMouseClickGeneric(int x, int y, XPLMMouseStatus inMouse, int bu
 
 	float outX, outY;
 	translateToImguiSpace(x, y, outX, outY);
+
 	io.MousePos = ImVec2(outX, outY);
 
 	switch (inMouse) {

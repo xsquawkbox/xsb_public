@@ -9,8 +9,9 @@
 #ifndef IMGWINDOW_H
 #define IMGWINDOW_H
 
+#include "SystemGL.h"
 #include "XOGLUtils.h"
-#include "ImgFontAtlas.h"
+
 #include <string>
 #include <memory>
 
@@ -18,6 +19,7 @@
 #include <XPCProcessing.h>
 #include <imgui.h>
 
+#include "ImgFontAtlas.h"
 
 /** ImgWindow is a Window for creating dear imgui widgets within.
  *
@@ -127,7 +129,7 @@ protected:
     virtual void buildInterface() = 0;
 
     /** onShow() is called before making the Window visible.  It provides an
-     * oportunity to prevent the window being shown.
+     * opportunity to prevent the window being shown.
      *
      * @note the implementation in the base-class is a null handler.  You can
      * safely override this without chaining.
