@@ -12,8 +12,6 @@
 #include <XPLMDisplay.h>
 #include <XPLMGraphics.h>
 
-
-
 static XPLMDataRef		gVrEnabledRef			= nullptr;
 static XPLMDataRef		gModelviewMatrixRef		= nullptr;
 static XPLMDataRef		gViewportRef			= nullptr;

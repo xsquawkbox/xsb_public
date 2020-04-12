@@ -1,9 +1,13 @@
-//
-// Created by chris on 29/02/2020.
-//
+/*
+ * ImgFontAtlas.h
+ *
+ * Integration for dear imgui into X-Plane.
+ *
+ * Copyright (C) 2020, Christopher Collins
+*/
 
-#ifndef XSQUAWKBOX_VATSIM_IMGFONTATLAS_H
-#define XSQUAWKBOX_VATSIM_IMGFONTATLAS_H
+#ifndef IMGFONTATLAS_H
+#define IMGFONTATLAS_H
 
 #include "SystemGL.h"
 #include <imgui.h>
@@ -59,11 +63,4 @@ private:
     int         mGLTextureNum;
 };
 
-#include <string>
-#include <memory>
-#include <XPLMDisplay.h>
-#include <XPCProcessing.h>
-#include <imgui.h>
-#include "SystemGL.h"
-
-#endif //XSQUAWKBOX_VATSIM_IMGFONTATLAS_H
+#endif //IMGFONTATLAS_H

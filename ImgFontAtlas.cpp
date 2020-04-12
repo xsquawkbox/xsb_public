@@ -1,10 +1,13 @@
-//
-// Created by chris on 29/02/2020.
-//
+/*
+ * ImgFontAtlas.cpp
+ *
+ * Integration for dear imgui into X-Plane.
+ *
+ * Copyright (C) 2020, Christopher Collins
+*/
 
 #include "ImgFontAtlas.h"
 #include <XPLMGraphics.h>
-#include "XOGLUtils.h"
 
 ImgFontAtlas::ImgFontAtlas():
     mOurAtlas(nullptr),
