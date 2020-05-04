@@ -54,7 +54,6 @@ ImgWindow::ImgWindow(
 	XPLMWindowLayer layer) :
 	mIsInVR(false),
 	mPreferredLayer(layer),
-	mSelfDestruct(false),
 	mFirstRender(true),
 	mFontAtlas(sFontAtlas)
 {
@@ -341,10 +340,10 @@ ImgWindow::updateImgui()
 
 	// finally, handle window focus.
 	int hasKeyboardFocus = XPLMHasKeyboardFocus(mWindowID);
-	if (io.WantCaptureKeyboard && !hasKeyboardFocus) {
+	if (io.WantTextInput && !hasKeyboardFocus) {
 		XPLMTakeKeyboardFocus(mWindowID);
 	}
-	else if (!io.WantCaptureKeyboard && hasKeyboardFocus) {
+	else if (!io.WantTextInput && hasKeyboardFocus) {
 		XPLMTakeKeyboardFocus(nullptr);
 		// reset keysdown otherwise we'll think any keys used to defocus the keyboard are still down!
 		for (auto &key : io.KeysDown) {
@@ -365,10 +364,6 @@ ImgWindow::DrawWindowCB(XPLMWindowID /* inWindowID */, void *inRefcon)
 	ImGui::Render();
 
 	thisWindow->RenderImGui(ImGui::GetDrawData());
-
-	if (thisWindow->mSelfDestruct) {
-		delete thisWindow;
-	}
 }
 
 int
@@ -546,6 +541,33 @@ ImgWindow::onShow()
 void
 ImgWindow::SafeDelete()
 {
-	mSelfDestruct = true;
+	sPendingDestruction.push(this);
+	if (sSelfDestructHandler == nullptr) {
+        XPLMCreateFlightLoop_t flParams{
+            sizeof(flParams),
+            xplm_FlightLoop_Phase_BeforeFlightModel,
+            &ImgWindow::SelfDestructCallback,
+            nullptr,
+        };
+        sSelfDestructHandler = XPLMCreateFlightLoop(&flParams);
+	}
+	XPLMScheduleFlightLoop(sSelfDestructHandler, -1, 1);
+}
+
+std::queue<ImgWindow *>  ImgWindow::sPendingDestruction;
+XPLMFlightLoopID         ImgWindow::sSelfDestructHandler = nullptr;
+
+float
+ImgWindow::SelfDestructCallback(float inElapsedSinceLastCall,
+                                float inElapsedTimeSinceLastFlightLoop,
+                                int inCounter,
+                                void *inRefcon)
+{
+    while (!sPendingDestruction.empty()) {
+        auto *thisObj = sPendingDestruction.front();
+        sPendingDestruction.pop();
+        delete thisObj;
+    }
+    return 0;
 }
 

@@ -44,6 +44,7 @@
 #include <XPLMDisplay.h>
 #include <XPCProcessing.h>
 #include <imgui.h>
+#include <queue>
 
 #include "ImgFontAtlas.h"
 
@@ -207,6 +208,13 @@ private:
         XPLMMouseStatus inMouse,
         void *inRefcon);
 
+    static float SelfDestructCallback(float inElapsedSinceLastCall,
+                                      float inElapsedTimeSinceLastFlightLoop,
+                                      int inCounter,
+                                      void *inRefcon);
+    static std::queue<ImgWindow *>  sPendingDestruction;
+    static XPLMFlightLoopID         sSelfDestructHandler;
+
     int HandleMouseClickGeneric(
         int x, int y,
         XPLMMouseStatus inMouse,
@@ -226,7 +234,6 @@ private:
 
     float mModelView[16], mProjection[16];
     int mViewport[4];
-    bool mSelfDestruct;
 
     std::string mWindowTitle;
 
@@ -241,8 +248,6 @@ private:
     int mRight;
 
     XPLMWindowLayer mPreferredLayer;
-
-
 };
 
 #endif // #ifndef IMGWINDOW_H
