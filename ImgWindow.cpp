@@ -42,6 +42,7 @@ static XPLMDataRef		gVrEnabledRef			= nullptr;
 static XPLMDataRef		gModelviewMatrixRef		= nullptr;
 static XPLMDataRef		gViewportRef			= nullptr;
 static XPLMDataRef		gProjectionMatrixRef	= nullptr;
+static XPLMDataRef		gFrameRatePeriodRef     = nullptr;
 
 std::shared_ptr<ImgFontAtlas> ImgWindow::sFontAtlas;
 
@@ -72,7 +73,7 @@ ImgWindow::ImgWindow(
 		gModelviewMatrixRef = XPLMFindDataRef("sim/graphics/view/modelview_matrix");
 		gViewportRef = XPLMFindDataRef("sim/graphics/view/viewport");
 		gProjectionMatrixRef = XPLMFindDataRef("sim/graphics/view/projection_matrix");
-
+        gFrameRatePeriodRef = XPLMFindDataRef("sim/operation/misc/frame_rate_period");
 		first_init=true;
 	}
 
@@ -325,6 +326,7 @@ ImgWindow::updateImgui()
 	float win_width = static_cast<float>(mRight - mLeft);
 	float win_height = static_cast<float>(mTop - mBottom);
 
+	io.DeltaTime = XPLMGetDataf(gFrameRatePeriodRef);
 	io.DisplaySize = ImVec2(win_width, win_height);
 	// in boxels, we're always scale 1, 1.
 	io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
