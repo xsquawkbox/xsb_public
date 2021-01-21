@@ -48,6 +48,7 @@ static XPLMDataRef		gVrEnabledRef			= nullptr;
 static XPLMDataRef		gModelviewMatrixRef		= nullptr;
 static XPLMDataRef		gViewportRef			= nullptr;
 static XPLMDataRef		gProjectionMatrixRef	= nullptr;
+static XPLMDataRef		gFrameRatePeriodRef     = nullptr;
 
 std::shared_ptr<ImgFontAtlas> ImgWindow::sFontAtlas;
 
@@ -78,7 +79,7 @@ ImgWindow::ImgWindow(
 		gModelviewMatrixRef = XPLMFindDataRef("sim/graphics/view/modelview_matrix");
 		gViewportRef = XPLMFindDataRef("sim/graphics/view/viewport");
 		gProjectionMatrixRef = XPLMFindDataRef("sim/graphics/view/projection_matrix");
-
+        gFrameRatePeriodRef = XPLMFindDataRef("sim/operation/misc/frame_rate_period");
 		first_init=true;
 	}
 
@@ -118,7 +119,7 @@ ImgWindow::ImgWindow(
 	if (mFontAtlas) {
         mFontTexture = static_cast<GLuint>(reinterpret_cast<intptr_t>(io.Fonts->TexID));
     } else {
-        if (iFontAtlas->TexID == nullptr) {
+        if (!iFontAtlas || iFontAtlas->TexID == nullptr) {
             // fallback binding if an atlas wasn't explicitly set.
             unsigned char *pixels;
             int width, height;
@@ -130,7 +131,7 @@ ImgWindow::ImgWindow(
             mFontTexture = (GLuint)texNum;
 
             // upload texture.
-            XPLMBindTexture2d(mFontTexture, 0);
+            XPLMBindTexture2d((int)mFontTexture, 0);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
@@ -256,7 +257,7 @@ ImgWindow::RenderImGui(ImDrawData *draw_data)
         io.DisplayFramebufferScale.y != 1.0)
         draw_data->ScaleClipRects(io.DisplayFramebufferScale);
 
-	updateMatrices();
+    updateMatrices();
 
 	// We are using the OpenGL fixed pipeline because messing with the
 	// shader-state in X-Plane is not very well documented, but using the fixed
@@ -294,7 +295,7 @@ ImgWindow::RenderImGui(ImDrawData *draw_data)
 			if (pcmd->UserCallback)	{
 				pcmd->UserCallback(cmd_list, pcmd);
 			} else {
-			    XPLMBindTexture2d((GLuint)(intptr_t)pcmd->TextureId, 0);
+			    XPLMBindTexture2d((int)(intptr_t)pcmd->TextureId, 0);
 
 				// Scissors work in viewport space - must translate the coordinates from ImGui -> Boxels, then Boxels -> Native.
 				//FIXME: it must be possible to apply the scale+transform manually to the projection matrix so we don't need to doublestep.
@@ -358,6 +359,11 @@ ImgWindow::updateImgui()
 	float win_width = static_cast<float>(mRight - mLeft);
 	float win_height = static_cast<float>(mTop - mBottom);
 
+    // Needed to add this to prevent io.DeltaTime causing a CTD because when X-Plane starts FrameRatePeriod is equal to 0.0f
+    float FrameRatePeriod = XPLMGetDataf(gFrameRatePeriodRef);
+    if (FrameRatePeriod > 0.0f) {
+        io.DeltaTime = XPLMGetDataf(gFrameRatePeriodRef);
+    }
 	io.DisplaySize = ImVec2(win_width, win_height);
 	// in boxels, we're always scale 1, 1.
 	io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
@@ -400,6 +406,13 @@ ImgWindow::DrawWindowCB(XPLMWindowID /* inWindowID */, void *inRefcon)
     
     // Give subclasses a chance to do something after all rendering
     thisWindow->afterRendering();
+    
+    // Hack: Reset the Backspace key if in VR (see HandleKeyFuncCB for details)
+    if (thisWindow->bResetBackspace) {
+        ImGuiIO& io = ImGui::GetIO();
+        io.KeysDown[XPLM_VK_BACK] = false;
+        thisWindow->bResetBackspace = false;
+    }
 }
 
 int
@@ -531,26 +544,50 @@ ImgWindow::HandleKeyFuncCB(
 	XPLMKeyFlags         inFlags,
 	char                 inVirtualKey,
 	void *               inRefcon,
-	int                  /*losingFocus*/)
+	int                  blosingFocus)
 {
 	auto *thisWindow = reinterpret_cast<ImgWindow *>(inRefcon);
 	ImGui::SetCurrentContext(thisWindow->mImGuiContext);
 	ImGuiIO& io = ImGui::GetIO();
 	if (io.WantCaptureKeyboard) {
-		auto vk = static_cast<unsigned char>(inVirtualKey);
-		io.KeysDown[vk] = (inFlags & xplm_DownFlag) == xplm_DownFlag;
-		io.KeyShift = (inFlags & xplm_ShiftFlag) == xplm_ShiftFlag;
-		io.KeyAlt = (inFlags & xplm_OptionAltFlag) == xplm_OptionAltFlag;
-		io.KeyCtrl = (inFlags & xplm_ControlFlag) == xplm_ControlFlag;
-
-        // inKey will only includes printable characters,
-        // but also those created with key combinations like @ or {}
-		if ((inFlags & xplm_DownFlag) == xplm_DownFlag &&
-            inKey > '\0')
+        
+        // Loosing focus? That's not exactly something ImGui allows us to do...
+        // we try convincing ImGui to let it go by sending an [Esc] key
+        if (blosingFocus) {
+            io.KeysDown[int(XPLM_VK_ESCAPE)] = true;
+        }
+        else
         {
-			char smallStr[2] = { inKey, 0 };
-			io.AddInputCharactersUTF8(smallStr);
-		}
+            // Hack for the Backspace key in VR:
+            // Apparently, the virtual VR keyboard sends both the Up and the Down
+            // event within the same drawing cycle, which would overwrite
+            // io.KeyDown[XPLM_VK_BACK] with false again before we could pass on true.
+            // Also see https://forums.x-plane.org/index.php?/forums/topic/147139-dear-imgui-x-plane/&do=findComment&comment=2032062
+            // though I am following a different solution:
+            // So we ignore the "up" event (release key) here, and do the actual
+            // release only after the next drawing cycle (flag bResetBackspace).
+            // (And this little delay doesn't hurt in non-VR either, so we don't even test for VR.)
+            
+            // If Backspace is _released_ ...
+            if (inVirtualKey == XPLM_VK_BACK && !(inFlags & xplm_DownFlag)) {
+                thisWindow->bResetBackspace = true; // have it reset only later in DrawWindowCB
+            }
+            else
+                // in all normal cases: save the up/down flag as it comes from XP
+                io.KeysDown[int(inVirtualKey)] = (inFlags & xplm_DownFlag) == xplm_DownFlag;
+            io.KeyShift = (inFlags & xplm_ShiftFlag) == xplm_ShiftFlag;
+            io.KeyAlt = (inFlags & xplm_OptionAltFlag) == xplm_OptionAltFlag;
+            io.KeyCtrl = (inFlags & xplm_ControlFlag) == xplm_ControlFlag;
+
+            // inKey will only includes printable characters,
+            // but also those created with key combinations like @ or {}
+            if ((inFlags & xplm_DownFlag) == xplm_DownFlag &&
+                inKey > '\0')
+            {
+                char smallStr[2] = { inKey, 0 };
+                io.AddInputCharactersUTF8(smallStr);
+            }
+        }
 	}
 }
 
