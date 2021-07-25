@@ -444,8 +444,22 @@ ImgWindow::HandleCursorFuncCB(
 	float outX, outY;
 	thisWindow->translateToImguiSpace(x, y, outX, outY);
 	io.MousePos = ImVec2(outX, outY);
-	//FIXME: Maybe we can support imgui's cursors a bit better?
-	return xplm_CursorDefault;
+	
+	// Exclude resize regions handled by XPLM for self-styled windows:
+	if (thisWindow->IsInsideSim() && thisWindow->bHandleWndResize &&
+		(x < (thisWindow->mLeft + WND_RESIZE_LEFT_WIDTH) ||
+		 x > (thisWindow->mRight - WND_RESIZE_RIGHT_WIDTH) ||
+		 y > (thisWindow->mTop - WND_RESIZE_TOP_WIDTH) ||
+		 y < (thisWindow->mBottom + WND_RESIZE_BOTTOM_WIDTH)))
+	{
+		// Defer to XPLM's hand cursor for managed resize grab regions:
+		io.MouseDrawCursor = false;
+		return xplm_CursorDefault;
+	}
+	
+	// Have ImGui take over the mouse cursor for the rest:
+	io.MouseDrawCursor = true;
+	return xplm_CursorHidden;
 }
 
 int
